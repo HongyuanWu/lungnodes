@@ -1,4 +1,3 @@
-
 data<-read.table("https://raw.githubusercontent.com/Shicheng-Guo/lungnodes/master/extdata/TCGA.3108.Marker.DJG.beta.txt",head=T)
 colnames(data)[2]<-"phen"
 iid<-data[,1]
@@ -6,10 +5,54 @@ phen<-data[,2]
 table(phen)
 clinical<-read.table("https://raw.githubusercontent.com/Shicheng-Guo/lungnodes/master/extdata/clinical.txt",head=T,row.names = 1)
 input<-data.matrix(data[,2:ncol(data)])
+rownames(input)<-data[,1]
+input[1:5,1:5]
 input[input[,1]<3,1]<-0
 input[input[,1]==3,1]<-1
 input[1:5,1:5]
+mean(input[,1])
+input<-input[,-which(apply(input,2,function(x) mean(x,na.rm=T))>0.61)]
+input[,1]
 match(iid,rownames(clinical))
+
+rlt<-c()
+for(i in 2:ncol(input)){
+  fit<-summary(glm(as.factor(input[,1])~input[,i],family=binomial))$coefficients[2,]
+  rlt<-rbind(rlt,fit)
+  print(i)
+}
+rlt<-data.frame(rlt)
+rownames(rlt)<-colnames(input)[2:ncol(input)]
+rlt<-subset(rlt,Estimate>0)
+rlt<-rlt[order(rlt[,4]),]
+head(rlt)
+
+temp<-input[,c(1,match(rownames(rlt[1:150,]),colnames(input)))]
+write.csv(temp,file="lungnode.scores.csv")
+
+rownames(temp)<-temp[,1]
+temp[1:5,1:5]
+table(temp[,1])
+head(temp)
+
+
+heatmap((temp[,2:ncol(temp)]))
+xx<-apply(temp[,2:ncol(temp)],1,sum)
+xx<-xx[order(names(xx))]
+plot(xx,col=as.numeric(names(xx))+1)
+
+index=data.frame(iid=rownames(temp),phen=temp[,1],score=apply(temp[,2:ncol(temp)],1,sum))
+write.table(index,file="lungnodes.index.txt",sep="\t",col.names = T,row.names = F,quote=F)             
+getwd()             
+
+input<-input[,c(1,match(rownames(rlt[1:30,]),colnames(input)))]
+dim(input)
+input<-input[,-match("chr2_74153317",colnames(input))]
+rownames(input)<-input[,1]
+heatmap(t(input[,2:ncol(input)]))
+
+plot(density(input[which(input[,1]==0),2]),col="blue",xlim=c(0,0.15))
+lines(density(input[which(input[,1]==1),2]),col="red",xlim=c(0,0.15))
 
 library("randomForest")
 library("neuralnet")
@@ -30,23 +73,24 @@ for(i in 1:k){
   
   P=apply(train.cv[,2:ncol(train.cv)],2,function(x) summary(glm(as.factor(train.cv[,1])~x,family=binomial))$coefficients[2,4])
   
-  train.cv<-train.cv[,c(1,match(names(P[head(order(P),n=5200)]),colnames(train.cv)))]
-  test.cv<-test.cv[,c(1,match(names(P[head(order(P),n=5200)]),colnames(test.cv)))]
+  train.cv<-train.cv[,c(1,na.omit(match(names(P[head(order(P),n=5200)]),colnames(train.cv))))]
+  test.cv<-test.cv[,c(1,na.omit(match(names(P[head(order(P),n=5200)]),colnames(test.cv))))]
 
-  train.cv[1:5,1:5]
+  train.cv[1:5,]
   
   RF <- randomForest(as.factor(phen) ~ ., data=data.frame(na.omit(train.cv)), importance=TRUE,proximity=T)
   imp<-RF$importance
   head(imp)
   imp<-imp[order(imp[,4],decreasing = T),]
   
+  if(nrow(imp)>=30){
   topvar<-match(rownames(imp)[1:30],colnames(input))
-  
+  }else{
+  topvar<-match(rownames(imp),colnames(input))
+  }
   train.cv <- input[index,c(1,topvar)]
   test.cv <- input[-index,c(1,topvar)]
   
-  RF <- randomForest(as.factor(phen) ~ ., data=data.frame(na.omit(train.cv)), importance=TRUE,proximity=T)
-  RF
   RF <- randomForest(as.factor(phen) ~ ., data=data.frame(na.omit(train.cv)), importance=TRUE,proximity=T)
   
   n <- colnames(train.cv)
@@ -94,3 +138,5 @@ chr<-unlist(lapply(strsplit(colnames(input)[2:ncol(input)],"_"), function(x) x[1
 pos<-unlist(lapply(strsplit(colnames(input)[2:ncol(input)],"_"), function(x) x[2]))
 probe<-data.frame(CHR=chr,POS=pos)
 head(probe)
+
+heatmap(input[,2:ncol(input)])
