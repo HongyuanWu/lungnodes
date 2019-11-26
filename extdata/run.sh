@@ -1,3 +1,7 @@
+cd ~/hpc/methylation/lungnodes/extdata
+
+bedtools intersect -wa -a ~/hpc/db/hg19/GPL13534_450K_hg19.bed -b biomarker3108.hg19.bed > biomarker3108.bed
+
 data<-read.table("https://raw.githubusercontent.com/Shicheng-Guo/lungnodes/master/extdata/TCGA.3108.Marker.DJG.beta.txt",head=T)
 colnames(data)[2]<-"phen"
 iid<-data[,1]
